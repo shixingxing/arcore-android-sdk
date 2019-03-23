@@ -44,10 +44,6 @@ class CpuImageRenderer {
             const AImage* ndk_image, float screen_aspect_ratio,
             int display_rotation, float splitter_pos);
 
-  void UpdateTextureCoordinates(int32_t image_width, int32_t image_height,
-                                float screen_aspect_ratio,
-                                int display_rotation);
-
   // Returns the generated texture name for the GL_TEXTURE_EXTERNAL_OES target.
   GLuint GetTextureId() const;
 
@@ -58,8 +54,6 @@ class CpuImageRenderer {
 
   GLuint texture_id_;
   GLuint overlay_texture_id_;
-  GLuint u_texture_id_;
-  GLuint v_texture_id_;
 
   GLuint attribute_position_;
   GLuint attribute_tex_coord_;

@@ -1,3 +1,23 @@
+===============================================================================
+
+The following files:
+tools/arcoreimg/linux/arcoreimg
+tools/arcoreimg/macos/arcoreimg
+tools/arcoreimg/windows/arcoreimg.exe
+
+as well as the files ending in ".apk" attached to [GitHub
+releases](https://github.com/google-ar/arcore-android-sdk/releases)
+
+are licensed as follows:
+
+Covered by the **Google APIs Terms of Service** at
+[https://developers.google.com/terms/](https://developers.google.com/terms/)
+
+===============================================================================
+
+Except as indicated previously in this LICENSE file,
+files in this SDK are licensed as follows:
+
 Copyright (c) 2017, Google Inc.
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

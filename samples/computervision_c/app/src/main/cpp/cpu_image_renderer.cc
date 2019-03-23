@@ -23,21 +23,14 @@
 
 namespace computer_vision {
 namespace {
-// Positions of the quad vertices in clip space (X, Y, Z).
+// Positions of the quad vertices in clip space (X, Y).
 const GLfloat kVertices[] = {
-    -1.0f, -1.0f, 0.0f, -1.0f, +1.0f, 0.0f,
-    +1.0f, -1.0f, 0.0f, +1.0f, +1.0f, 0.0f,
-};
-
-// UVs of the quad vertices (S, T)
-const GLfloat kUvs[] = {
-    0.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 0.0f,
+    -1.0f, -1.0f, +1.0f, -1.0f, -1.0f, +1.0f, +1.0f, +1.0f,
 };
 
 constexpr int kSobelEdgeThreshold = 128 * 128;
-constexpr int kCoordsPerVertex = 3;
+constexpr int kCoordsPerVertex = 2;
 constexpr int kTexCoordsPerVertex = 2;
-constexpr int kTextureCount = 4;
 constexpr char kVertexShaderFilename[] = "shaders/cpu_image.vert";
 constexpr char kFragmentShaderFilename[] = "shaders/cpu_image.frag";
 
@@ -130,8 +123,8 @@ bool DetectEdge(const AImage* ndk_image, int32_t width, int32_t height,
 }  // namespace
 
 void CpuImageRenderer::InitializeGlContent(AAssetManager* asset_manager) {
-  GLuint textures[kTextureCount];
-  glGenTextures(kTextureCount, textures);
+  GLuint textures[2];
+  glGenTextures(2, textures);
 
   texture_id_ = textures[0];
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture_id_);
@@ -142,18 +135,6 @@ void CpuImageRenderer::InitializeGlContent(AAssetManager* asset_manager) {
 
   overlay_texture_id_ = textures[1];
   glBindTexture(GL_TEXTURE_2D, overlay_texture_id_);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-  u_texture_id_ = textures[2];
-  glBindTexture(GL_TEXTURE_2D, u_texture_id_);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-
-  v_texture_id_ = textures[3];
-  glBindTexture(GL_TEXTURE_2D, v_texture_id_);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -211,11 +192,16 @@ void CpuImageRenderer::Draw(const ArSession* session, const ArFrame* frame,
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_EXTERNAL_OES, texture_id_);
 
-  UpdateTextureCoordinates(width, height, screen_aspect_ratio,
-                           display_rotation);
-  // Update GPU image texture coordinates.
-  ArFrame_transformDisplayUvCoords(session, frame, kNumVertices * 2, kUvs,
-                                   transformed_tex_coord_);
+  // Update CPU image & GPU texture coordinates.
+  ArFrame_transformCoordinates2d(
+      session, frame, AR_COORDINATES_2D_OPENGL_NORMALIZED_DEVICE_COORDINATES,
+      kNumVertices, kVertices, AR_COORDINATES_2D_IMAGE_NORMALIZED,
+      transformed_img_coord_);
+  ArFrame_transformCoordinates2d(
+      session, frame, AR_COORDINATES_2D_OPENGL_NORMALIZED_DEVICE_COORDINATES,
+      kNumVertices, kVertices, AR_COORDINATES_2D_TEXTURE_NORMALIZED,
+      transformed_tex_coord_);
+
   if (is_valid_cpu_image) {
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, overlay_texture_id_);
@@ -252,38 +238,6 @@ void CpuImageRenderer::Draw(const ArSession* session, const ArFrame* frame,
   glDepthMask(GL_TRUE);
   glEnable(GL_DEPTH_TEST);
   util::CheckGlError("CpuImageRenderer::Draw() error");
-}
-
-void CpuImageRenderer::UpdateTextureCoordinates(int32_t image_width,
-                                                int32_t image_height,
-                                                float screen_aspect_ratio,
-                                                int display_rotation) {
-  // Crop the CPU image to fit the screen aspect ratio.
-  float image_aspect_ratio = static_cast<float>(image_width) / image_height;
-  float cropped_width, cropped_height;
-  if (screen_aspect_ratio < image_aspect_ratio) {
-    cropped_width = image_height * screen_aspect_ratio;
-    cropped_height = image_height;
-  } else {
-    cropped_width = image_width;
-    cropped_height = image_width / screen_aspect_ratio;
-  }
-
-  float u = (image_width - cropped_width) / image_width / 2.f;
-  float v = (image_height - cropped_height) / image_height / 2.f;
-  // 4 possible display rotation.
-  float tex_coords[4][kNumVertices * 2] = {
-      {u, 1 - v, u, v, 1 - u, 1 - v, 1 - u, v},  // Surface.ROTATION_0
-      {1 - u, 1 - v, u, 1 - v, 1 - u, v, u, v},  // Surface.ROTATION_90
-      {1 - u, v, 1 - u, 1 - v, u, v, u, 1 - v},  // Surface.ROTATION_180
-      {u, v, 1 - u, v, u, 1 - v, 1 - u, 1 - v}   // Surface.ROTATION_270
-  };
-
-  if (display_rotation < 0 || display_rotation > 3) {
-    display_rotation = 0;  // default;
-  }
-  std::copy(tex_coords[display_rotation], tex_coords[display_rotation] + 8,
-            transformed_img_coord_);
 }
 
 GLuint CpuImageRenderer::GetTextureId() const { return texture_id_; }
